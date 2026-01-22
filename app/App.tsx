@@ -31,11 +31,9 @@ export default function App() {
 
         if(!isConnected){
             reg = text;
-            Alert.alert('Offline mode: Registration saved locally:', reg);
             console.log('Offline mode: Registration saved locally:', reg);
         } else {
             // Send registration as normal to the server...
-            reg = null
             console.log('Online mode: Registration sent to server:', text);
         }
     }
