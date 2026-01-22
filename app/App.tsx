@@ -16,7 +16,8 @@ import {
 export default function App() {
 
   const [text, onChangeText] = React.useState('Enter registration');
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  let reg: string | null = null;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -26,16 +27,27 @@ export default function App() {
     return () => unsubscribe();
   }, []);  
 
+    const setReg = () => {      
 
-    //if(!isConnected){
-      //  Alert.alert('No internet connection', 'Please connect to the internet to proceed.');
-    //} else {
-    //    Alert.alert('Internet connection', 'You are connected to the internet.');
-    //}
+        if(!isConnected){
+            reg = text;
+            Alert.alert('Offline mode: Registration saved locally:', reg);
+            console.log('Offline mode: Registration saved locally:', reg);
+        } else {
+            // Send registration as normal to the server...
+            reg = null
+            console.log('Online mode: Registration sent to server:', text);
+        }
+    }
+
+    if(isConnected && reg !== null){
+        // Send any locally saved registrations to the server...
+        console.log('Online mode: Sending locally saved registration to server:', reg);
+    }
 
     return (
         <View style={styles.container}>
-          <ImageBackground source={require('../assets/images/default-background.png')} resizeMode="cover" style={styles.image}>
+          <ImageBackground source={require('../assets/images/default-background.png')} contentFit="cover" style={styles.image}>
             <Image
               source={require('../assets/images/logo.png')}
               style={styles.logo}
@@ -52,7 +64,7 @@ export default function App() {
               />
             <Pressable
               style={styles.button}
-              onPress={() => Alert.alert('Code received:', text)}
+              onPress={() => setReg()}
 >
               <Text style={styles.buttonText}>Next</Text>
             </Pressable>
