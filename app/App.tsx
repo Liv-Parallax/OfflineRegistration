@@ -53,6 +53,11 @@ export default function App() {
     }, [isConnected]);
 
     const setReg = async () => {      
+      if(text.length > 10){
+        alert('Not a valid registration.');
+        onChangeText('');
+        return;
+      }
       alert('setReg called');
         if (!text.trim() || text.trim() === 'Enter registration') {
             console.log('No registration entered.');
@@ -83,9 +88,9 @@ export default function App() {
               style={styles.logo}
               resizeMode="contain"
               />
-              <Text>
+              {/*<Text>
                 {isConnected ? 'Online Mode' : 'Offline Mode'}
-              </Text>
+              </Text>*/}
               <TextInput
                 style={styles.input}
                 onChangeText={onChangeText}
@@ -130,8 +135,8 @@ const styles = StyleSheet.create({
     height: 50,
     width: '75%',
     margin: 5,
-    borderWidth: 1,
-    borderRadius: 10, 
+    borderBottomWidth: 1,  
+    borderBottomColor: '#999', 
     padding: 20,
     textAlign: 'center',
     color: '#fff',
@@ -141,7 +146,7 @@ const styles = StyleSheet.create({
     width: '75%',
     height: 50,
     marginTop: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
