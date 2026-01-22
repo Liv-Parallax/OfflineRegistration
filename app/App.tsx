@@ -1,5 +1,6 @@
 import { ImageBackground } from 'expo-image';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import NetInfo from "@react-native-community/netinfo";
 
 import {
   Alert,
@@ -15,6 +16,22 @@ import {
 export default function App() {
 
   const [text, onChangeText] = React.useState('Enter registration');
+  const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => unsubscribe();
+  }, []);  
+
+
+    //if(!isConnected){
+      //  Alert.alert('No internet connection', 'Please connect to the internet to proceed.');
+    //} else {
+    //    Alert.alert('Internet connection', 'You are connected to the internet.');
+    //}
 
     return (
         <View style={styles.container}>
@@ -24,10 +41,13 @@ export default function App() {
               style={styles.logo}
               resizeMode="contain"
               />
+              <Text>
+                {isConnected ? 'Online Mode' : 'Offline Mode'}
+              </Text>
               <TextInput
                 style={styles.input}
                 onChangeText={onChangeText}
-                placeholder="Enter validation code"
+                placeholder="Enter registration"
                 placeholderTextColor="#999"
               />
             <Pressable
