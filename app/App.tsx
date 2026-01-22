@@ -1,9 +1,9 @@
-import { ImageBackground } from 'expo-image';
-import React, { useState, useEffect } from 'react';
+import { addRegistration } from "@/components/AddReg";
 import NetInfo from "@react-native-community/netinfo";
+import { ImageBackground } from 'expo-image';
+import React, { useEffect, useState } from 'react';
 
 import {
-  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -17,23 +17,34 @@ export default function App() {
 
   const [text, onChangeText] = React.useState('Enter registration');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  let reg: string | null = null;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
     });
 
+
     return () => unsubscribe();
   }, []);  
 
-    const setReg = () => {      
+    const setReg = async () => {      
 
-        if(!isConnected){
-            reg = text;
-            console.log('Offline mode: Registration saved locally:', reg);
+        if(!isConnected){ // Offline: Registration saved locally.
+            try {
+            console.log('About to insert:', text);
+            await addRegistration(text);
+            console.log('Insert OK');
+          } catch (e) {
+            console.error('DB insert failed:', e);
+          }
+            console.log('Offline mode: Registration saved locally:', text);
         } else {
-            // Send registration as normal to the server...
+
+            //await addRegistration(text); // Send registration as normal to the server.
+            //const allRows = await db.getAllAsync<{Reg: string}>('SELECT * FROM Registration');
+            //for (const row of allRows) {
+           //   console.log(row.Reg);
+           // }
             console.log('Online mode: Registration sent to server:', text);
         }
     }
@@ -41,6 +52,10 @@ export default function App() {
     if(isConnected && reg !== null){
         // Send any locally saved registrations to the server...
         console.log('Online mode: Sending locally saved registration to server:', reg);
+    } else if (!isConnected){
+        console.log('Offline mode.')
+    } else{
+        console.log('Online mode.')
     }
 
     return (
