@@ -17,7 +17,6 @@ export default function App() {
 
   const [text, onChangeText] = React.useState('');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -32,7 +31,7 @@ export default function App() {
       const resetRegistrations = async () => {
         try{
           const regs = await getAllRegistrations();
-           alert(JSON.stringify(regs));
+          alert(JSON.stringify(regs));
           if (regs.length === 0) {
             console.log('No local registrations to sync.');
             return;
@@ -43,7 +42,10 @@ export default function App() {
           await clearRegistrations();
 
           const afterClear = await getAllRegistrations();
-           alert('After clearing DB: ' + JSON.stringify(afterClear));  // list returns null
+          // if(afterClear.length !== 0){       makes the app crash.
+          //   resetRegistrations(); 
+          // }
+          alert('After clearing DB: ' + JSON.stringify(afterClear));  // list returns null
         }catch(e){
           console.error('Error accessing local registrations.', e);
         }
@@ -52,33 +54,61 @@ export default function App() {
     }
     }, [isConnected]);
 
-    const setReg = async () => {      
-      if(text.length > 10){
-        alert('Not a valid registration.');
+    const setReg = async (value?: string) => {
+      const reg = value ?? text;  
+      if(reg.length > 10){
+        //alert('Not a valid registration.');
         onChangeText('');
         return;
       }
-      alert('setReg called');
-        if (!text.trim() || text.trim() === 'Enter registration') {
+      //alert('setReg called');
+        if (!reg.trim() || reg.trim() === 'Enter registration') {
             console.log('No registration entered.');
             return;
         }
 
         if(!isConnected){ // Offline: Registration saved locally.
           try {
-            console.log('About to insert:', text);
-            await addRegistration(text);
-            alert(JSON.stringify(text));
+            console.log('About to insert:', reg);
+            await addRegistration(reg);
+            //alert(JSON.stringify(text));
             console.log('Insert OK');
           } catch (e) {
             console.error('DB insert failed:', e);
           }
-            console.log('Offline mode: Registration saved locally:', text);
+            console.log('Offline mode: Registration saved locally:', reg);
         } else {
-            console.log('Online mode: Registration sent to server:', text); // Placeholder for server submission logic.
+            console.log('Online mode: Registration sent to server:', reg); // Placeholder for server submission logic.
         }
         onChangeText('');
     }
+
+    // const runBulkTest = async () => {
+    //   console.log('Starting bulk test');
+
+    //   for (let i = 0; i < 10000; i++) { // tests up to 3974 entries and doesnt crash however, when it gets to this level not all registrations are cleared.
+    //     const fakeReg = `REG${i}`; 
+    //     await setReg(fakeReg);
+
+    //     await new Promise(res => setTimeout(res, 0));
+    //   }
+    // };
+
+    // useEffect(() => {
+    //   if (__DEV__ && isConnected === false) {
+    //     runBulkTest();
+    //   }
+    // }, [isConnected]);
+
+    // button:
+    // {__DEV__ && (
+    //         <Pressable
+    //           style={[styles.button, { backgroundColor: 'tomato', marginTop: 10 }]}
+    //           onPress={runBulkTest}
+    //         >
+    //         <Text style={styles.buttonText}>Run Bulk Test</Text>
+    //         </Pressable>
+    //         )}
 
     return (
         <View style={styles.container}>
@@ -91,6 +121,7 @@ export default function App() {
               {/*<Text>
                 {isConnected ? 'Online Mode' : 'Offline Mode'}
               </Text>*/}
+              
               <TextInput
                 style={styles.input}
                 onChangeText={onChangeText}
@@ -98,16 +129,12 @@ export default function App() {
                 placeholder="Enter registration"
                 placeholderTextColor="#999"
               />
-            <Pressable
-              style={styles.button}
-              onPress={() => {
-                console.log('BUTTON PRESSED'); 
-                setReg();
-              }}
->
-              <Text style={styles.buttonText}>Next</Text>
-            </Pressable>
-
+              <Pressable 
+                style={styles.button} 
+                onPress={() => { console.log('BUTTON PRESSED'); setReg(); }} 
+                > 
+                <Text style={styles.buttonText}>Next</Text> 
+              </Pressable>
             </ImageBackground>
         </View>
     );
