@@ -1,7 +1,7 @@
-import { addRegistration } from "@/components/AddReg";
 import NetInfo from "@react-native-community/netinfo";
 import { ImageBackground } from 'expo-image';
 import React, { useEffect, useState } from 'react';
+import { addRegistration } from '../components/AddReg';
 
 import {
   Image,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 
-export default function App() {
+export default async function App() {
 
   const [text, onChangeText] = React.useState('Enter registration');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
@@ -23,7 +23,6 @@ export default function App() {
       setIsConnected(state.isConnected);
     });
 
-
     return () => unsubscribe();
   }, []);  
 
@@ -32,26 +31,24 @@ export default function App() {
         if(!isConnected){ // Offline: Registration saved locally.
             try {
             console.log('About to insert:', text);
-            await addRegistration(text);
+            addRegistration(text);
             console.log('Insert OK');
           } catch (e) {
             console.error('DB insert failed:', e);
           }
             console.log('Offline mode: Registration saved locally:', text);
         } else {
-
-            //await addRegistration(text); // Send registration as normal to the server.
-            //const allRows = await db.getAllAsync<{Reg: string}>('SELECT * FROM Registration');
-            //for (const row of allRows) {
-           //   console.log(row.Reg);
-           // }
             console.log('Online mode: Registration sent to server:', text);
         }
     }
 
-    if(isConnected && reg !== null){
+    if(isConnected){
         // Send any locally saved registrations to the server...
-        console.log('Online mode: Sending locally saved registration to server:', reg);
+        //const allRows = await db.getAllAsync<{Reg: string}>('SELECT * FROM Registration');     
+           // for (const row of allRows) {
+           //   console.log(row.Reg);
+          //  } // currently printing the records... However, here is where you'd send them to the server.
+      //  console.log('Online mode: Sending locally saved registration to server:', text);
     } else if (!isConnected){
         console.log('Offline mode.')
     } else{

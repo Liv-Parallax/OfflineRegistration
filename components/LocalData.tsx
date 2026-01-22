@@ -16,3 +16,28 @@ export async function getDB() {
 
   return db;
 }
+
+export async function addRegistration(reg: string): Promise<void> {
+  if (!reg || !reg.trim()) return;
+
+  const normalized = reg.replace(/\s+/g, '').toUpperCase();
+  const db = await getDB();
+
+  await db.runAsync(
+    'INSERT OR IGNORE INTO Registration (Reg) VALUES (?);',
+    [normalized]
+  );
+}
+
+export async function getAllRegistrations(): Promise<string[]> {
+  const db = await getDB();
+  const results = await db.getAllAsync<{ Reg: string }>(
+    'SELECT Reg FROM Registration;'
+  );
+  return results.map(row => row.Reg);
+}
+
+export async function clearRegistrations(): Promise<void> {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM Registration;');
+}
