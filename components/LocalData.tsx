@@ -20,8 +20,8 @@ export async function getDB() {
 export async function addRegistration(reg: string): Promise<void> {
   if (!reg || !reg.trim()) return;
 
-  const normalized = reg.replace(/\s+/g, '').toUpperCase();
   const db = await getDB();
+  const normalized = reg.replace(/\s+/g, '').toUpperCase();
 
   await db.runAsync(
     'INSERT OR IGNORE INTO Registration (Reg) VALUES (?);',

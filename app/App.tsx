@@ -1,7 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
 import { ImageBackground } from 'expo-image';
 import React, { useEffect, useState } from 'react';
-import { addRegistration } from '../components/AddReg';
+import { addRegistration, clearRegistrations, getAllRegistrations } from '../components/LocalData';
 
 import {
   Image,
@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 
 
-export default async function App() {
+export default function App() {
 
-  const [text, onChangeText] = React.useState('Enter registration');
+  const [text, onChangeText] = React.useState('');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -24,35 +25,54 @@ export default async function App() {
     });
 
     return () => unsubscribe();
-  }, []);  
+  }, []); 
+
+  useEffect(() => {
+    if (isConnected) {
+      const resetRegistrations = async () => {
+        try{
+          const regs = await getAllRegistrations();
+           alert(JSON.stringify(regs));
+          if (regs.length === 0) {
+            console.log('No local registrations to sync.');
+            return;
+          }
+          for (const reg of regs) {
+            // Send to your server.
+          }
+          await clearRegistrations();
+
+          const afterClear = await getAllRegistrations();
+           alert('After clearing DB: ' + JSON.stringify(afterClear));  // list returns null
+        }catch(e){
+          console.error('Error accessing local registrations.', e);
+        }
+      };
+      resetRegistrations();
+    }
+    }, [isConnected]);
 
     const setReg = async () => {      
+      alert('setReg called');
+        if (!text.trim() || text.trim() === 'Enter registration') {
+            console.log('No registration entered.');
+            return;
+        }
 
         if(!isConnected){ // Offline: Registration saved locally.
-            try {
+          try {
             console.log('About to insert:', text);
-            addRegistration(text);
+            await addRegistration(text);
+            alert(JSON.stringify(text));
             console.log('Insert OK');
           } catch (e) {
             console.error('DB insert failed:', e);
           }
             console.log('Offline mode: Registration saved locally:', text);
         } else {
-            console.log('Online mode: Registration sent to server:', text);
+            console.log('Online mode: Registration sent to server:', text); // Placeholder for server submission logic.
         }
-    }
-
-    if(isConnected){
-        // Send any locally saved registrations to the server...
-        //const allRows = await db.getAllAsync<{Reg: string}>('SELECT * FROM Registration');     
-           // for (const row of allRows) {
-           //   console.log(row.Reg);
-          //  } // currently printing the records... However, here is where you'd send them to the server.
-      //  console.log('Online mode: Sending locally saved registration to server:', text);
-    } else if (!isConnected){
-        console.log('Offline mode.')
-    } else{
-        console.log('Online mode.')
+        onChangeText('');
     }
 
     return (
@@ -69,12 +89,16 @@ export default async function App() {
               <TextInput
                 style={styles.input}
                 onChangeText={onChangeText}
+                value={text}
                 placeholder="Enter registration"
                 placeholderTextColor="#999"
               />
             <Pressable
               style={styles.button}
-              onPress={() => setReg()}
+              onPress={() => {
+                console.log('BUTTON PRESSED'); 
+                setReg();
+              }}
 >
               <Text style={styles.buttonText}>Next</Text>
             </Pressable>
