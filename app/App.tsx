@@ -17,7 +17,9 @@ export default function App() {
 
   const [text, onChangeText] = React.useState('');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [registrations, setRegistrations] = useState<number | null>(null);
 
+  // Monitor network connectivity changes.
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
@@ -25,90 +27,108 @@ export default function App() {
 
     return () => unsubscribe();
   }, []); 
-
+  // Effect to handle reconnection and sync local registrations.
   useEffect(() => {
     if (isConnected) {
-      const resetRegistrations = async () => {
-        try{
+      const directRegsAfterReconnect = async () => {
+        try {
           const regs = await getAllRegistrations();
-          alert(JSON.stringify(regs));
-          if (regs.length === 0) {
-            console.log('No local registrations to sync.');
-            return;
+          if (regs === null || regs.length === 0) {
+            console.log('No local registrations to sync. (After reconnect)');
+            return;            
           }
-          for (const reg of regs) {
-            // Send to your server.
-          }
-          await clearRegistrations();
-
-          const afterClear = await getAllRegistrations();
-          // if(afterClear.length !== 0){       makes the app crash.
-          //   resetRegistrations(); 
-          // }
-          alert('After clearing DB: ' + JSON.stringify(afterClear));  // list returns null
-        }catch(e){
-          console.error('Error accessing local registrations.', e);
-        }
-      };
-      resetRegistrations();
+          alert('To sync: ' + registrations + ' registrations. (After reconnect)');
+          console.log(regs.length + ' registrations to sync. (After reconnect)');
+          sendLocalRegistrations(regs);
+        } catch (e) {}
+      };        
+      directRegsAfterReconnect();      
     }
-    }, [isConnected]);
+  }, [isConnected, registrations]);         
+  
 
-    const setReg = async (value?: string) => {
-      const reg = value ?? text;  
-      if(reg.length > 10){
-        //alert('Not a valid registration.');
-        onChangeText('');
+  // Online/Offline direction for either saving a reg locally or sending to server.
+  const setReg = async (value?: string) => {
+    const reg = value ?? text;  
+    if(reg.length > 10){
+      alert('Please enter a valid registration.');
+      onChangeText('');
+      return;
+    }
+    if (!reg.trim() || reg.trim() === 'Enter registration') {
+        console.log('No registration entered.');
+        return;
+    }
+
+    if(!isConnected){ // Offline: Registration saved locally.
+      try {
+        await addRegistration(reg);
+      } catch (e) {}
+    } else {
+      console.log('Online mode: Registration sent to server:', reg); // Placeholder for server submission logic.
+    }
+    onChangeText('');
+  };
+  // Send local registrations to server when back online.
+  const sendLocalRegistrations = async (regs: string[]) => {
+    try{
+      if (regs.length === 0) {
         return;
       }
-      //alert('setReg called');
-        if (!reg.trim() || reg.trim() === 'Enter registration') {
-            console.log('No registration entered.');
-            return;
-        }
 
-        if(!isConnected){ // Offline: Registration saved locally.
-          try {
-            console.log('About to insert:', reg);
-            await addRegistration(reg);
-            //alert(JSON.stringify(text));
-            console.log('Insert OK');
-          } catch (e) {
-            console.error('DB insert failed:', e);
-          }
-            console.log('Offline mode: Registration saved locally:', reg);
-        } else {
-            console.log('Online mode: Registration sent to server:', reg); // Placeholder for server submission logic.
-        }
-        onChangeText('');
+      alert('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
+      console.log('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
+
+      for (const reg of regs) {
+        // Send to your server.
+      }
+
+      clearLocalRegistrations(regs);
+
+    }catch(e){
+      console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
+  };
+  // Clear local registrations after successful sync.
+  const clearLocalRegistrations = async (regs: string[]) => {
+    try {
+      await clearRegistrations();
+      const afterClear = await getAllRegistrations();
+      if (afterClear.length === 0) {
+        console.log('Local registrations cleared after sync. (clearLocalRegistrations)');
+      } else{
+        setRegistrations(afterClear.length);
+      }
+      console.log('(clearLocalRegistrations. After clearing DB:', afterClear);
+      alert('After clearing DB: ' + JSON.stringify(afterClear));
 
-    // const runBulkTest = async () => {
-    //   console.log('Starting bulk test');
+    } catch (e) {
+      console.error('Error clearing local registrations.', e);
+    }
+  };
 
-    //   for (let i = 0; i < 10000; i++) { // tests up to 3974 entries and doesnt crash however, when it gets to this level not all registrations are cleared.
-    //     const fakeReg = `REG${i}`; 
-    //     await setReg(fakeReg);
 
-    //     await new Promise(res => setTimeout(res, 0));
-    //   }
-    // };
+  // Testing. - 10,000 registrations.
+  const runBulkTest = async () => {
+    console.log('Starting bulk test');
 
-    // useEffect(() => {
-    //   if (__DEV__ && isConnected === false) {
-    //     runBulkTest();
-    //   }
-    // }, [isConnected]);
+    for (let i = 0; i < 10000; i++) { 
+      const fakeReg = `REG${i}`; 
+      await setReg(fakeReg);
 
-    // button:
-    // {__DEV__ && (
-    //         <Pressable
-    //           style={[styles.button, { backgroundColor: 'tomato', marginTop: 10 }]}
-    //           onPress={runBulkTest}
-    //         >
-    //         <Text style={styles.buttonText}>Run Bulk Test</Text>
-    //         </Pressable>
-    //         )}
+      await new Promise(res => setTimeout(res, 0));
+    }
+  };
+
+    //button:
+    // <Pressable 
+    //             style={styles.button} 
+    //             onPress={() => { console.log('BUTTON PRESSED'); setReg(); }} 
+    //             > 
+    //             <Text style={styles.buttonText}>Next</Text> 
+    //           </Pressable>
+    // Button when not bulk testing.
+    
 
     return (
         <View style={styles.container}>
@@ -129,12 +149,15 @@ export default function App() {
                 placeholder="Enter registration"
                 placeholderTextColor="#999"
               />
-              <Pressable 
-                style={styles.button} 
-                onPress={() => { console.log('BUTTON PRESSED'); setReg(); }} 
-                > 
-                <Text style={styles.buttonText}>Next</Text> 
-              </Pressable>
+              {__DEV__ && (
+            <Pressable
+              style={[styles.button, { backgroundColor: 'tomato' }]}
+              onPress={runBulkTest}
+            >
+            <Text style={styles.buttonText}>Run Bulk Test</Text>
+            </Pressable>
+            )}
+              
             </ImageBackground>
         </View>
     );
