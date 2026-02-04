@@ -32,12 +32,12 @@ export default function App() {
     if (isConnected) {
       const directRegsAfterReconnect = async () => {
         try {
-          const regs = await getAllRegistrations();
+          let regs = await getAllRegistrations();
+          alert("All registations: " + regs.length + " which are... " + JSON.stringify(regs))
           if (regs === null || regs.length === 0) {
             console.log('No local registrations to sync. (After reconnect)');
             return;            
           }
-          alert('To sync: ' + registrations + ' registrations. (After reconnect)');
           console.log(regs.length + ' registrations to sync. (After reconnect)');
           sendLocalRegistrations(regs);
         } catch (e) {}
@@ -75,8 +75,6 @@ export default function App() {
       if (regs.length === 0) {
         return;
       }
-
-      alert('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
       console.log('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
 
       for (const reg of regs) {
@@ -89,22 +87,28 @@ export default function App() {
       console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
   };
-  // Clear local registrations after successful sync.
-  const clearLocalRegistrations = async (regs: string[]) => {
-    try {
-      await clearRegistrations();
-      const afterClear = await getAllRegistrations();
-      if (afterClear.length === 0) {
-        console.log('Local registrations cleared after sync. (clearLocalRegistrations)');
-      } else{
-        setRegistrations(afterClear.length);
-      }
-      console.log('(clearLocalRegistrations. After clearing DB:', afterClear);
-      alert('After clearing DB: ' + JSON.stringify(afterClear));
 
-    } catch (e) {
-      console.error('Error clearing local registrations.', e);
-    }
+  const clearLocalRegistrations = async (regs: string[]) => { 
+    console.log('clearRegistrations START');
+    
+    try { 
+      regs = await getAllRegistrations();
+
+      alert('Before clearing DB: ' + JSON.stringify(regs.length));
+
+      await clearRegistrations(); 
+
+      const afterClear = await getAllRegistrations(); 
+      console.log('After clearing DB:', afterClear); 
+
+      setRegistrations(afterClear.length); 
+
+      alert('After clearing DB: ' + JSON.stringify(afterClear.length));
+      console.log('clearRegistrations DONE');
+
+    } catch (e) { 
+      console.error('Error clearing local registrations.', e); 
+    } 
   };
 
 

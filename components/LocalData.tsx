@@ -39,5 +39,6 @@ export async function getAllRegistrations(): Promise<string[]> {
 
 export async function clearRegistrations(): Promise<void> {
   const db = await getDB();
-  await db.runAsync('DELETE FROM Registration;');
+  await db.runAsync('DELETE FROM Registration;'); // wait until delete is done
+  console.log("Delete fully committed");
 }
