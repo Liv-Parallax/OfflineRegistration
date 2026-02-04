@@ -7,10 +7,15 @@ export async function getDB() {
     db = await SQLite.openDatabaseAsync('localdata.db');
 
     await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS Registration (
-        Reg TEXT PRIMARY KEY NOT NULL
-      );
+        PRAGMA journal_mode = WAL;
+
+        DROP TABLE IF EXISTS Registration;
+
+        CREATE TABLE Registration (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          Reg TEXT NOT NULL UNIQUE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     `);
   }
 
@@ -32,13 +37,31 @@ export async function addRegistration(reg: string): Promise<void> {
 export async function getAllRegistrations(): Promise<string[]> {
   const db = await getDB();
   const results = await db.getAllAsync<{ Reg: string }>(
-    'SELECT Reg FROM Registration;'
+    'SELECT Reg AS reg FROM Registration;'
   );
   return results.map(row => row.Reg);
 }
 
 export async function clearRegistrations(): Promise<void> {
   const db = await getDB();
-  await db.runAsync('DELETE FROM Registration;'); // wait until delete is done
-  console.log("Delete fully committed");
+  console.log("Attempting to clear...")
+
+    await db.runAsync(`DELETE FROM Registration
+                        WHERE id IN (
+                        SELECT id
+                        FROM Registration
+                        ORDER BY id ASC
+                        LIMIT 100
+                      );
+    `);
+      
+
+    console.log("Cleared.")
+
 }
+  
+// export async function clearRegistrations(chunkSize: number): Promise<void> {
+//   const db = await getDB();
+
+//   await db.runAsync('DELETE FROM Registration;'); // Delete all.
+//   }

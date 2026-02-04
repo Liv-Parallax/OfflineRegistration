@@ -20,13 +20,15 @@ export default function App() {
   const [registrations, setRegistrations] = useState<number | null>(null);
 
   // Monitor network connectivity changes.
+  // Checking every x amount of time. - from Offline to Online.
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
+      console.log("Reconnected.")
       setIsConnected(state.isConnected);
     });
-
     return () => unsubscribe();
   }, []); 
+
   // Effect to handle reconnection and sync local registrations.
   useEffect(() => {
     if (isConnected) {
@@ -77,56 +79,62 @@ export default function App() {
       }
       console.log('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
 
-      for (const reg of regs) {
-        // Send to your server.
-      }
+      const chunkSize = 1000;
 
-      clearLocalRegistrations(regs);
+      for (let i = 0; i < regs.length; i += chunkSize) {
+        const chunk = regs.slice(i, i + chunkSize); // get the sub-array
+
+        //console.log(`Sending chunk ${i / chunkSize + 1} with ${chunk.length} registrations`);
+        await Promise.all(chunk.map(reg => {
+          // Send to the server.
+        }));
+
+        await new Promise(res => setTimeout(res, 0)); // Pause for UI.
+      }
+      clearLocalRegistrations(5000, regs);
 
     }catch(e){
       console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
   };
 
-  const clearLocalRegistrations = async (regs: string[]) => { 
+  // TODO: 
+  // clear in chunks.
+  const clearLocalRegistrations = async (chunkSize: number, regs: string[]) => { 
     console.log('clearRegistrations START');
     
     try { 
       regs = await getAllRegistrations();
 
-      alert('Before clearing DB: ' + JSON.stringify(regs.length));
+      //alert('Before clearing DB: ' + JSON.stringify(regs.length));
+      if(regs.length == null) return;
 
-      await clearRegistrations(); 
+      await clearRegistrations();
+      await new Promise(res => setTimeout(res, 0));
 
       const afterClear = await getAllRegistrations(); 
-      console.log('After clearing DB:', afterClear); 
+      setRegistrations(afterClear.length); // Final check.
+      console.log('After clearing DB:', afterClear.length);
 
-      setRegistrations(afterClear.length); 
-
-      alert('After clearing DB: ' + JSON.stringify(afterClear.length));
+      //alert('After clearing DB: ' + JSON.stringify(afterClear.length));
       console.log('clearRegistrations DONE');
 
     } catch (e) { 
       console.error('Error clearing local registrations.', e); 
     } 
-  };
+};
 
-
-  // Testing. - 10,000 registrations.
   const runBulkTest = async () => {
     console.log('Starting bulk test');
 
-    const chunkSize = 500; // adjust based on device performance
-    const regs = Array.from({ length: 100000 }, (_, i) => `REG${i}`);
+    const regs = Array.from({ length: 100000 }, (_, i) => `REG${i}`); // testing 100,000 entries.
 
-    for (let i = 0; i < regs.length; i += chunkSize) {
-      const chunk = regs.slice(i, i + chunkSize);        // sub array.
-      await Promise.all(chunk.map(reg => setReg(reg)));  // Each chunk is uploaded concurrently. - later implement for real regs.
-      await new Promise(res => setTimeout(res, 0));      // Small pause between uploads.
-    }
+    // Insert everything concurrently.
+    await Promise.all(regs.map(reg => setReg(reg)));
 
     console.log('Bulk test complete');
   };
+
 
     //button:
     // <Pressable 
@@ -146,9 +154,9 @@ export default function App() {
               style={styles.logo}
               resizeMode="contain"
               />
-              {/*<Text>
+              {<Text>
                 {isConnected ? 'Online Mode' : 'Offline Mode'}
-              </Text>*/}
+              </Text>}
               
               <TextInput
                 style={styles.input}
