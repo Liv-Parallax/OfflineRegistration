@@ -33,7 +33,7 @@ export default function App() {
       const directRegsAfterReconnect = async () => {
         try {
           let regs = await getAllRegistrations();
-          alert("All registations: " + regs.length + " which are... " + JSON.stringify(regs))
+          alert("There are " + regs.length + " (After reconnect).")
           if (regs === null || regs.length === 0) {
             console.log('No local registrations to sync. (After reconnect)');
             return;            
@@ -116,12 +116,16 @@ export default function App() {
   const runBulkTest = async () => {
     console.log('Starting bulk test');
 
-    for (let i = 0; i < 10000; i++) { 
-      const fakeReg = `REG${i}`; 
-      await setReg(fakeReg);
+    const chunkSize = 500; // adjust based on device performance
+    const regs = Array.from({ length: 100000 }, (_, i) => `REG${i}`);
 
-      await new Promise(res => setTimeout(res, 0));
+    for (let i = 0; i < regs.length; i += chunkSize) {
+      const chunk = regs.slice(i, i + chunkSize);        // sub array.
+      await Promise.all(chunk.map(reg => setReg(reg)));  // Each chunk is uploaded concurrently. - later implement for real regs.
+      await new Promise(res => setTimeout(res, 0));      // Small pause between uploads.
     }
+
+    console.log('Bulk test complete');
   };
 
     //button:
