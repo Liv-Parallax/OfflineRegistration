@@ -39,7 +39,7 @@ export async function getAllRegistrations(): Promise<string[]> {
   return results.map(row => row.reg);
 }
 
-// Fetch a chunk of registrations with their DB ids. Use this for sending + ack-based deletes.
+// Fetch a chunk of registrations with their DB ids. Use this for sending + chunk-based deletes.
 export async function getRegistrations(limit = 1000): Promise<{ id: number; reg: string }[]> {
   const db = await getDB();
   const rows = await db.getAllAsync<{ id: number; reg: string }>(
@@ -54,42 +54,12 @@ export async function deleteRegistrationsByIds(ids: number[]): Promise<void> {
   if (!ids || ids.length === 0) return;
   const db = await getDB();
   const placeholders = ids.map(() => '?').join(',');
-  console.log("deleting...")
+  console.log("deleting: " + ids)
   await db.runAsync(`DELETE FROM Registration WHERE id IN (${placeholders});`, ids);
 }
-
-export async function clearRegistrations(chunkSize = 1000): Promise<void> {
-  const db = await getDB();
-  console.log(`Attempting to clear registrations in chunks of ${chunkSize}...`);
-
-  while (true) {
-    // Delete up to `chunkSize` rows (oldest first)
-    await db.runAsync(`
-      DELETE FROM Registration
-      WHERE rowid IN (
-        SELECT rowid
-        FROM Registration
-        ORDER BY rowid ASC
-        LIMIT ?);
-    `, [chunkSize]);
-
-    // Check remaining count
-    const rows = await db.getAllAsync<{ count: number }>('SELECT COUNT(*) AS count FROM Registration;');
-    const remaining = rows[0]?.count ?? 0;
-    console.log(`Remaining registrations: ${remaining}`);
-
-    // yield to the event loop so UI and NetInfo can be processed
-    await new Promise((res) => setTimeout(res, 2));
-
-    if (remaining === 0) {
-      console.log('Clearing complete.');
-      break;
-    }
-  }
-}
   
-// export async function clearRegistrations(chunkSize: number): Promise<void> {
-//   const db = await getDB();
+export async function clearRegistrations(chunkSize: number): Promise<void> {
+  const db = await getDB();
 
-//   await db.runAsync('DELETE FROM Registration;'); // Delete all.
-//   }
+  await db.runAsync('DELETE FROM Registration;'); // Delete all.
+}
