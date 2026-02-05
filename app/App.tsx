@@ -14,9 +14,7 @@ import {
 
 
 // Issues: 
-//   - When the app is reloaded it doesnt proporly send data? - not sure if this will be an issue as when used the app wont be reloaded.
-
-
+//   - When the app is reloaded (half way through chunks sending and deleting) it doesnt proporly send data? - not sure if this will be an issue as when used the app wont be reloaded.
 export default function App() {
 
   const [text, onChangeText] = React.useState('');
@@ -45,6 +43,7 @@ export default function App() {
     }
   };
 
+  // For when the app reconnects back to the internet.
   useEffect(() => {
     if(netInfo.isConnected === true){
       setIsConnected(true);
@@ -54,7 +53,6 @@ export default function App() {
     }
   }, [netInfo.isConnected, registrations])   
 
-  
   // Send local registrations to server when back online.
   const sendLocalRegistrations = async (chunkSize: number) => {
     try {
@@ -104,7 +102,7 @@ export default function App() {
         totalSent += rows.length;
         alert(`Progress: chunk ${chunkIndex} sent. totalSent=${totalSent}`);
 
-        // yield so UI and NetInfo can run (use slightly longer pause to be safer)
+        // can pause here.
         await new Promise(res => setTimeout(res, 0));
       }
 
@@ -117,8 +115,7 @@ export default function App() {
       console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
   };
-
-// Online/Offline direction for either saving a reg locally or sending to server.
+  // setRegs online. + direct to addRegistration (LocalData.tsx) if offline.
   const setReg = async (value?: string) => {
     const reg = value ?? text;  
     if(reg.length > 10){
@@ -141,8 +138,6 @@ export default function App() {
     }
     onChangeText('');
   };
-
-
   // This slows the selecting and deleting down a lot. - done all offline.
   const runBulkTest = async () => {
     console.log('Starting bulk test');
@@ -162,7 +157,6 @@ export default function App() {
 
     console.log('Bulk test complete');
   };
-
 
     //button:
     // <Pressable 
