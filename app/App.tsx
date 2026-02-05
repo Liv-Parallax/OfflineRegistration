@@ -38,7 +38,7 @@ export default function App() {
       }
 
       alert("Someting to delete: " + regs.length);
-      await sendLocalRegistrations(100);
+      await sendLocalRegistrations(5000);
 
     } catch (e) {
       console.error('Error during reconnection sync', e);
@@ -73,6 +73,7 @@ export default function App() {
 
         if (!rows || rows.length === 0) {
           console.log('No more local registrations to send.');
+          setRegistrations(0);
           break;
         }
 
