@@ -19,14 +19,16 @@ Quick, actionable guidance for an AI coding agent to be productive in this repos
 - `tsconfig.json` — path alias `@/*` maps to repository root; imports commonly use `@/...`.
 
 ## Important implementation details & patterns ⚠️
-- Database initialization: `getDB()` runs `PRAGMA journal_mode = WAL;` (performance/concurrency) and creates the `Registration` table.
-  - NOTE: `getDB()` currently includes `DROP TABLE IF EXISTS Registration;` — this will remove persisted registrations on a fresh JS runtime/database open. Check intent before modifying DB schema.
+- Database initialization: `getDB()` runs `PRAGMA journal_mode = WAL;` (performance/concurrency) and creates the `Registration` table using `CREATE TABLE IF NOT EXISTS`.
+  - NOTE: Older iterations of this repo dropped `Registration` on DB open; current code preserves persisted registrations. If you change schema, add a migration strategy instead of deleting data.
 - Schema & constraints: `Registration(Reg TEXT NOT NULL UNIQUE, created_at DEFAULT CURRENT_TIMESTAMP)` — registrations are unique.
 - Normalization: `addRegistration` strips whitespace and uppercases (`reg.replace(/\s+/g,'').toUpperCase()`), which is the canonical form used throughout.
-- Chunking strategy:
-  - `sendLocalRegistrations` batches sends with `chunkSize = 1000` and pauses with `setTimeout(..., 0)` to yield to the UI.
-  - `clearRegistrations()` deletes up to 100 rows using `LIMIT 100` — note this is a single-pass delete; to fully clear a large DB you must repeat deletion until empty.
-- SQL alias gotcha: `getAllRegistrations()` uses `SELECT Reg AS reg ...` but maps `row.Reg` in code — validate column names (`row.reg` vs `row.Reg`) when reading results.
+- Chunking and sync strategy:
+  - Use `getRegistrations(limit)` to fetch a chunk of rows (returns `{ id, reg }`) and send those to the server.
+  - After an acknowledgement from the server, call `deleteRegistrationsByIds(ids)` to delete only those rows. This prevents accidental deletion of unsent data.
+  - `sendLocalRegistrations` batches chunks (default `1000`) and yields to the event loop between batches to avoid blocking `NetInfo` events.
+  - `clearRegistrations()` performs a chunked delete loop (default `chunkSize = 1000`) until the table is empty and is intended as a fallback or admin operation.
+- SQL alias gotcha: `getAllRegistrations()` uses `SELECT Reg AS reg ...` and returns `row.reg` — be consistent when writing SQL aliases and using the returned fields.
 
 ## Where to add work (common tasks) 💡
 - Implement server sync: `sendLocalRegistrations` in `app/App.tsx` is the intended place for network calls. Ensure batch/ack semantics and idempotency.

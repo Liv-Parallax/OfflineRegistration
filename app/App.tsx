@@ -1,7 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
 import { ImageBackground } from 'expo-image';
 import React, { useEffect, useState } from 'react';
-import { addRegistration, clearRegistrations, getAllRegistrations, getDB, getRegistrations, deleteRegistrationsByIds } from '../components/LocalData';
+import { addRegistration, clearRegistrations, deleteRegistrationsByIds, getAllRegistrations, getDB, getRegistrations } from '../components/LocalData';
 
 import {
   Image,
@@ -20,12 +20,31 @@ export default function App() {
   const [registrations, setRegistrations] = useState<number | null>(null);
 
   // Monitor network connectivity changes.
-  // Checking every x amount of time. - from Offline to Online.
+  // Log state changes and trigger an immediate sync when we transition online.
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      console.log("Reconnected.")
+      console.log('NetInfo change:', { isConnected: state.isConnected });
       setIsConnected(state.isConnected);
+      if (state.isConnected) {
+        // Trigger sync immediately (don't wait for another effect cycle)
+        sendLocalRegistrations().catch((e) => console.error('sendLocalRegistrations error on NetInfo change', e));
+      }
     });
+
+    // Also fetch current state on mount and kick off sync if already online
+    (async () => {
+      try {
+        const net = await NetInfo.fetch();
+        console.log('NetInfo initial fetch isConnected=', net.isConnected);
+        setIsConnected(net.isConnected);
+        if (net.isConnected) {
+          sendLocalRegistrations().catch((e) => console.error('Initial sendLocalRegistrations error', e));
+        }
+      } catch (e) {
+        console.warn('NetInfo.fetch failed', e);
+      }
+    })();
+
     return () => unsubscribe();
   }, []); 
 
@@ -75,9 +94,11 @@ export default function App() {
 
       while (true) {
         // Fetch the next chunk of rows (id + reg)
+        console.log('Fetching next chunk to send...');
         const rows = await getRegistrations(chunkSize);
         if (!rows || rows.length === 0) {
           console.log('No more local registrations to send.');
+          alert('No more local registrations to send.');
           break;
         }
 
@@ -98,6 +119,7 @@ export default function App() {
         // On success delete only the rows we just sent
         const ids = rows.map(r => r.id);
         await deleteRegistrationsByIds(ids);
+        console.log(`Deleted ${ids.length} rows after successful send.`);
 
         // yield so UI and NetInfo can run
         await new Promise(res => setTimeout(res, 0));
@@ -106,7 +128,13 @@ export default function App() {
       // final state update
       const remaining = await getAllRegistrations();
       setRegistrations(remaining.length);
-      console.log('sendLocalRegistrations complete');
+      if (remaining.length === 0 || remaining === null){
+        console.log('sendLocalRegistrations complete. remaining=' + remaining.length);
+        alert('sendLocalRegistrations complete. remaining=' + remaining.length);
+        return;
+      }
+      console.log('Remaining=' + remaining.length);
+      alert('Remaining=' + remaining.length);
     } catch (e) {
       console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
@@ -147,14 +175,14 @@ export default function App() {
 
     const total = 100000;
     const regs = Array.from({ length: total }, (_, i) => `REG${i}`); // testing 100,000 entries.
-    const chunkSize = 5000;
+    const chunkSize = 1000;
 
     for (let i = 0; i < regs.length; i += chunkSize) {
       const chunk = regs.slice(i, i + chunkSize);
       // Insert this batch concurrently but allow event loop to process between batches
       await Promise.all(chunk.map((reg) => setReg(reg)));
       console.log(`Inserted ${Math.min(i + chunkSize, regs.length)}/${regs.length}`);
-      await new Promise((res) => setTimeout(res, 2));
+      await new Promise((res) => setTimeout(res, 10));
     }
 
     // Explicitly refresh NetInfo after heavy work (some events may have been delayed)

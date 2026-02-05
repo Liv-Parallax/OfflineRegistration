@@ -10,7 +10,7 @@ export async function getDB() {
         PRAGMA journal_mode = WAL;
 
         CREATE TABLE IF NOT EXISTS Registration (
-          id INTEGER PRIMARY KEY NOT NULL AUTOINCREMENT,
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
           Reg TEXT NOT NULL UNIQUE,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -54,6 +54,7 @@ export async function deleteRegistrationsByIds(ids: number[]): Promise<void> {
   if (!ids || ids.length === 0) return;
   const db = await getDB();
   const placeholders = ids.map(() => '?').join(',');
+  console.log("deleting...")
   await db.runAsync(`DELETE FROM Registration WHERE id IN (${placeholders});`, ids);
 }
 
