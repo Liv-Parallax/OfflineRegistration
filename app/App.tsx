@@ -1,4 +1,4 @@
-import NetInfo, { useNetInfo } from "@react-native-community/netinfo";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { ImageBackground } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import { addRegistration, deleteRegistrationsByIds, getAllRegistrations, getRegistrations } from '../components/LocalData';
@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 
 
+// Issues: 
+//   - When the app is reloaded it doesnt proporly send data? - not sure if this will be an issue as when used the app wont be reloaded.
+
+
 export default function App() {
 
   const [text, onChangeText] = React.useState('');
@@ -24,6 +28,9 @@ export default function App() {
     try {
       let regs = await getAllRegistrations();
       await new Promise(res => setTimeout(res, 2));
+
+      console.log(JSON.stringify(regs))
+
       if(regs.length === 0 || regs === null){
         console.log("Nothing to direct.");
         alert("Nothing to direct.");
@@ -31,7 +38,7 @@ export default function App() {
       }
 
       alert("Someting to delete: " + regs.length);
-      await sendLocalRegistrations(5000);
+      await sendLocalRegistrations(100);
 
     } catch (e) {
       console.error('Error during reconnection sync', e);
@@ -53,8 +60,7 @@ export default function App() {
     try {
 
       let regs = await getAllRegistrations();
-      await new Promise(res => setTimeout(res, 10));
-      
+      await new Promise(res => setTimeout(res, 0));
 
       let chunkIndex = 0;
       let totalSent = 0;
@@ -89,8 +95,8 @@ export default function App() {
         try {
           await deleteRegistrationsByIds(ids);
           console.log(`Chunk ${chunkIndex}: Deleted ${ids.length} rows after successful send.`);
-        } catch (delErr) {
-          console.error('Error deleting sent rows for chunk', chunkIndex, delErr);
+        } catch (e) {
+          console.error('Error deleting sent rows for chunk', chunkIndex, e);
           return;
         }
 
@@ -98,7 +104,7 @@ export default function App() {
         alert(`Progress: chunk ${chunkIndex} sent. totalSent=${totalSent}`);
 
         // yield so UI and NetInfo can run (use slightly longer pause to be safer)
-        await new Promise(res => setTimeout(res, 10));
+        await new Promise(res => setTimeout(res, 0));
       }
 
       // final state update
@@ -129,35 +135,29 @@ export default function App() {
         await addRegistration(reg);
       } catch (e) {}
     } else {
-      console.log('Online mode: Registration sent to server:', reg); // Placeholder for server submission logic.
+      console.log('Online mode: Registration sent to server:', reg); 
+      // Placeholder for server submission logic.
     }
     onChangeText('');
   };
 
 
-  // Does everything else work without this? - any features handling big data must be done outside of this function.
+  // This slows the selecting and deleting down a lot. - done all offline.
   const runBulkTest = async () => {
     console.log('Starting bulk test');
 
     const total = 200000;
-    const regs = Array.from({ length: total }, (_, i) => `REG${i}`); // testing 100,000 entries.
-    const chunkSize = 5000;
+    const regs = Array.from({ length: total }, (_, i) => `REG${i}`); // testing 200,000 entries.
+    const chunkSize = 2500;
 
-    for (let i = 0; i < regs.length; i += chunkSize) {
+    for (let i = 0; i < total; i += chunkSize) {
       const chunk = regs.slice(i, i + chunkSize);
       // Insert this batch concurrently but allow event loop to process between batches
       await Promise.all(chunk.map((reg) => setReg(reg)));
       console.log(`Inserted ${Math.min(i + chunkSize, regs.length)}/${regs.length}`);
       await new Promise((res) => setTimeout(res, 2));
     }
-
-    // Explicitly refresh NetInfo after heavy work (some events may have been delayed)
-    try {
-      const netState = await NetInfo.fetch();
-      setIsConnected(netState.isConnected);
-    } catch (e) {
-      console.warn('Failed to fetch NetInfo after bulk test', e);
-    }
+    alert("Ran bulk test.")
 
     console.log('Bulk test complete');
   };
@@ -194,12 +194,19 @@ export default function App() {
               />
               {__DEV__ && (
             <Pressable
-              style={[styles.button, { backgroundColor: 'tomato' }]}
               onPress={runBulkTest}
+              style={({ pressed }) => [
+                styles.button,
+                {
+                  backgroundColor: 'tomato',
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
             >
             <Text style={styles.buttonText}>Run Bulk Test</Text>
             </Pressable>
-            )}
+              )}
               
             </ImageBackground>
         </View>

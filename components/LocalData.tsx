@@ -40,7 +40,7 @@ export async function getAllRegistrations(): Promise<string[]> {
 }
 
 // Fetch a chunk of registrations with their DB ids. Use this for sending + chunk-based deletes.
-export async function getRegistrations(limit = 1000): Promise<{ id: number; reg: string }[]> {
+export async function getRegistrations(limit: number): Promise<{ id: number; reg: string }[]> {
   const db = await getDB();
   const rows = await db.getAllAsync<{ id: number; reg: string }>(
     'SELECT id, Reg AS reg FROM Registration ORDER BY id ASC LIMIT ?;',
