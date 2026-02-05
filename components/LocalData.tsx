@@ -46,6 +46,7 @@ export async function getRegistrations(limit = 1000): Promise<{ id: number; reg:
     'SELECT id, Reg AS reg FROM Registration ORDER BY id ASC LIMIT ?;',
     [limit]
   );
+  console.log(`getRegistrations(limit=${limit}) -> ${rows.length} rows`);
   return rows.map(r => ({ id: Number((r as any).id), reg: r.reg }));
 }
 

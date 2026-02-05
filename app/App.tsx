@@ -17,6 +17,7 @@ export default function App() {
 
   const [text, onChangeText] = React.useState('');
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [registrations, setRegistrations] = useState<number | null>(null);
   const netInfo = useNetInfo();
 
   const directRegsAfterReconnect = async () => {
@@ -30,7 +31,7 @@ export default function App() {
       }
 
       alert("Someting to delete: " + regs.length);
-      await sendLocalRegistrations(1000);
+      await sendLocalRegistrations(5000);
 
     } catch (e) {
       console.error('Error during reconnection sync', e);
@@ -44,24 +45,32 @@ export default function App() {
     } else {
       setIsConnected(false);
     }
-  }, [netInfo.isConnected])   
+  }, [netInfo.isConnected, registrations])   
 
   
   // Send local registrations to server when back online.
   const sendLocalRegistrations = async (chunkSize: number) => {
     try {
 
+      let regs = await getAllRegistrations();
+      await new Promise(res => setTimeout(res, 10));
+      
+
+      let chunkIndex = 0;
+      let totalSent = 0;
+
       while (true) {
-        // Fetch the next chunk of rows (id + reg)
+        chunkIndex += 1;
+        console.log(`Chunk ${chunkIndex}: fetching up to ${chunkSize} rows`);
         const rows = await getRegistrations(chunkSize);
-        await new Promise(res => setTimeout(res, 0));
+        console.log(`Chunk ${chunkIndex}: got ${rows.length} rows`);
 
         if (!rows || rows.length === 0) {
           console.log('No more local registrations to send.');
-          alert('No more local registrations to send.');
           break;
         }
 
+        console.log(`Chunk ${chunkIndex}: Sending ${rows.length} registrations to server.`);
 
         // Placeholder: send to server. Replace this with real network call. If any item fails, throw and stop.
         try {
@@ -77,11 +86,25 @@ export default function App() {
 
         // On success delete only the rows we just sent
         const ids = rows.map(r => r.id);
-        await deleteRegistrationsByIds(ids);
+        try {
+          await deleteRegistrationsByIds(ids);
+          console.log(`Chunk ${chunkIndex}: Deleted ${ids.length} rows after successful send.`);
+        } catch (delErr) {
+          console.error('Error deleting sent rows for chunk', chunkIndex, delErr);
+          return;
+        }
 
-        // yield so UI and NetInfo can run
-        await new Promise(res => setTimeout(res, 0));
+        totalSent += rows.length;
+        alert(`Progress: chunk ${chunkIndex} sent. totalSent=${totalSent}`);
+
+        // yield so UI and NetInfo can run (use slightly longer pause to be safer)
+        await new Promise(res => setTimeout(res, 10));
       }
+
+      // final state update
+      const remaining = await getAllRegistrations();
+      setRegistrations(remaining.length);
+      console.log('sendLocalRegistrations complete. totalSent=' + totalSent + ' remaining=' + remaining.length);
 
     } catch (e) {
       console.error('Error accessing local registrations. (sendRegistrations)', e);
@@ -116,9 +139,9 @@ export default function App() {
   const runBulkTest = async () => {
     console.log('Starting bulk test');
 
-    const total = 100000;
+    const total = 200000;
     const regs = Array.from({ length: total }, (_, i) => `REG${i}`); // testing 100,000 entries.
-    const chunkSize = 1000;
+    const chunkSize = 5000;
 
     for (let i = 0; i < regs.length; i += chunkSize) {
       const chunk = regs.slice(i, i + chunkSize);
