@@ -9,16 +9,13 @@ export async function getDB() {
     await db.execAsync(`
         PRAGMA journal_mode = WAL;
 
-        DROP TABLE IF EXISTS Registration;
-
-        CREATE TABLE Registration (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS Registration (
+          id INTEGER PRIMARY KEY NOT NULL AUTOINCREMENT,
           Reg TEXT NOT NULL UNIQUE,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     `);
   }
-
   return db;
 }
 
@@ -36,28 +33,58 @@ export async function addRegistration(reg: string): Promise<void> {
 
 export async function getAllRegistrations(): Promise<string[]> {
   const db = await getDB();
-  const results = await db.getAllAsync<{ Reg: string }>(
-    'SELECT Reg AS reg FROM Registration;'
+  const results = await db.getAllAsync<{ reg: string }>(
+    'SELECT Reg AS reg FROM Registration ORDER BY id ASC;'
   );
-  return results.map(row => row.Reg);
+  return results.map(row => row.reg);
 }
 
-export async function clearRegistrations(): Promise<void> {
+// Fetch a chunk of registrations with their DB ids. Use this for sending + ack-based deletes.
+export async function getRegistrations(limit = 1000): Promise<{ id: number; reg: string }[]> {
   const db = await getDB();
-  console.log("Attempting to clear...")
+  const rows = await db.getAllAsync<{ id: number; reg: string }>(
+    'SELECT id, Reg AS reg FROM Registration ORDER BY id ASC LIMIT ?;',
+    [limit]
+  );
+  return rows.map(r => ({ id: Number((r as any).id), reg: r.reg }));
+}
 
-    await db.runAsync(`DELETE FROM Registration
-                        WHERE id IN (
-                        SELECT id
-                        FROM Registration
-                        ORDER BY id ASC
-                        LIMIT 100
-                      );
-    `);
-      
+// Delete specific registration rows by id (only those acknowledged by server)
+export async function deleteRegistrationsByIds(ids: number[]): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  const db = await getDB();
+  const placeholders = ids.map(() => '?').join(',');
+  await db.runAsync(`DELETE FROM Registration WHERE id IN (${placeholders});`, ids);
+}
 
-    console.log("Cleared.")
+export async function clearRegistrations(chunkSize = 1000): Promise<void> {
+  const db = await getDB();
+  console.log(`Attempting to clear registrations in chunks of ${chunkSize}...`);
 
+  while (true) {
+    // Delete up to `chunkSize` rows (oldest first)
+    await db.runAsync(`
+      DELETE FROM Registration
+      WHERE rowid IN (
+        SELECT rowid
+        FROM Registration
+        ORDER BY rowid ASC
+        LIMIT ?);
+    `, [chunkSize]);
+
+    // Check remaining count
+    const rows = await db.getAllAsync<{ count: number }>('SELECT COUNT(*) AS count FROM Registration;');
+    const remaining = rows[0]?.count ?? 0;
+    console.log(`Remaining registrations: ${remaining}`);
+
+    // yield to the event loop so UI and NetInfo can be processed
+    await new Promise((res) => setTimeout(res, 2));
+
+    if (remaining === 0) {
+      console.log('Clearing complete.');
+      break;
+    }
+  }
 }
   
 // export async function clearRegistrations(chunkSize: number): Promise<void> {

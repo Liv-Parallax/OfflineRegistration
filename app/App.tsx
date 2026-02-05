@@ -1,7 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
 import { ImageBackground } from 'expo-image';
 import React, { useEffect, useState } from 'react';
-import { addRegistration, clearRegistrations, getAllRegistrations } from '../components/LocalData';
+import { addRegistration, clearRegistrations, getAllRegistrations, getDB, getRegistrations, deleteRegistrationsByIds } from '../components/LocalData';
 
 import {
   Image,
@@ -22,7 +22,7 @@ export default function App() {
   // Monitor network connectivity changes.
   // Checking every x amount of time. - from Offline to Online.
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
       console.log("Reconnected.")
       setIsConnected(state.isConnected);
     });
@@ -34,17 +34,14 @@ export default function App() {
     if (isConnected) {
       const directRegsAfterReconnect = async () => {
         try {
-          let regs = await getAllRegistrations();
-          alert("There are " + regs.length + " (After reconnect).")
-          if (regs === null || regs.length === 0) {
-            console.log('No local registrations to sync. (After reconnect)');
-            return;            
-          }
-          console.log(regs.length + ' registrations to sync. (After reconnect)');
-          sendLocalRegistrations(regs);
-        } catch (e) {}
-      };        
-      directRegsAfterReconnect();      
+          await getDB();
+          // Kick off the chunked send which will delete acknowledged rows.
+          await sendLocalRegistrations();
+        } catch (e) {
+          console.error('Error during reconnection sync', e);
+        }
+      };
+      directRegsAfterReconnect();
     }
   }, [isConnected, registrations]);         
   
@@ -72,51 +69,72 @@ export default function App() {
     onChangeText('');
   };
   // Send local registrations to server when back online.
-  const sendLocalRegistrations = async (regs: string[]) => {
-    try{
-      if (regs.length === 0) {
-        return;
-      }
-      console.log('Sending ' + regs.length + ' registrations to server. (sendRegistrations)');
-
+  const sendLocalRegistrations = async () => {
+    try {
       const chunkSize = 1000;
 
-      for (let i = 0; i < regs.length; i += chunkSize) {
-        const chunk = regs.slice(i, i + chunkSize); // get the sub-array
+      while (true) {
+        // Fetch the next chunk of rows (id + reg)
+        const rows = await getRegistrations(chunkSize);
+        if (!rows || rows.length === 0) {
+          console.log('No more local registrations to send.');
+          break;
+        }
 
-        //console.log(`Sending chunk ${i / chunkSize + 1} with ${chunk.length} registrations`);
-        await Promise.all(chunk.map(reg => {
-          // Send to the server.
-        }));
+        console.log(`Sending chunk of ${rows.length} registrations to server.`);
 
-        await new Promise(res => setTimeout(res, 0)); // Pause for UI.
+        // Placeholder: send to server. Replace this with real network call. If any item fails, throw and stop.
+        try {
+          await Promise.all(rows.map(async (r) => {
+            // Example placeholder: await sendToServer(r.reg)
+            return Promise.resolve();
+          }));
+        } catch (sendErr) {
+          console.error('Error sending a chunk to server, will retry later', sendErr);
+          // Stop processing further chunks; leave them for retry on next reconnect
+          return;
+        }
+
+        // On success delete only the rows we just sent
+        const ids = rows.map(r => r.id);
+        await deleteRegistrationsByIds(ids);
+
+        // yield so UI and NetInfo can run
+        await new Promise(res => setTimeout(res, 0));
       }
-      clearLocalRegistrations(5000, regs);
 
-    }catch(e){
+      // final state update
+      const remaining = await getAllRegistrations();
+      setRegistrations(remaining.length);
+      console.log('sendLocalRegistrations complete');
+    } catch (e) {
       console.error('Error accessing local registrations. (sendRegistrations)', e);
     }
   };
 
-  // TODO: 
-  // clear in chunks.
-  const clearLocalRegistrations = async (chunkSize: number, regs: string[]) => { 
+  // Clear local registrations after successful server ack. Uses chunked DB deletion implemented in `components/LocalData`.
+  const clearLocalRegistrations = async (regs: string[] = []) => { 
     console.log('clearRegistrations START');
-    
+
     try { 
+      // Ensure we have the latest set before clearing
       regs = await getAllRegistrations();
 
-      //alert('Before clearing DB: ' + JSON.stringify(regs.length));
-      if(regs.length == null) return;
+      if (!regs || regs.length === 0) {
+        console.log('No registrations to clear.');
+        setRegistrations(0);
+        return;
+      }
 
+      // `clearRegistrations` will delete in repeated chunks until empty
       await clearRegistrations();
+
+      // small yield so logs and NetInfo can settle
       await new Promise(res => setTimeout(res, 0));
 
       const afterClear = await getAllRegistrations(); 
       setRegistrations(afterClear.length); // Final check.
       console.log('After clearing DB:', afterClear.length);
-
-      //alert('After clearing DB: ' + JSON.stringify(afterClear.length));
       console.log('clearRegistrations DONE');
 
     } catch (e) { 
@@ -127,10 +145,25 @@ export default function App() {
   const runBulkTest = async () => {
     console.log('Starting bulk test');
 
-    const regs = Array.from({ length: 100000 }, (_, i) => `REG${i}`); // testing 100,000 entries.
+    const total = 100000;
+    const regs = Array.from({ length: total }, (_, i) => `REG${i}`); // testing 100,000 entries.
+    const chunkSize = 5000;
 
-    // Insert everything concurrently.
-    await Promise.all(regs.map(reg => setReg(reg)));
+    for (let i = 0; i < regs.length; i += chunkSize) {
+      const chunk = regs.slice(i, i + chunkSize);
+      // Insert this batch concurrently but allow event loop to process between batches
+      await Promise.all(chunk.map((reg) => setReg(reg)));
+      console.log(`Inserted ${Math.min(i + chunkSize, regs.length)}/${regs.length}`);
+      await new Promise((res) => setTimeout(res, 2));
+    }
+
+    // Explicitly refresh NetInfo after heavy work (some events may have been delayed)
+    try {
+      const netState = await NetInfo.fetch();
+      setIsConnected(netState.isConnected);
+    } catch (e) {
+      console.warn('Failed to fetch NetInfo after bulk test', e);
+    }
 
     console.log('Bulk test complete');
   };
